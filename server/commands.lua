@@ -1,9 +1,5 @@
--- server/commands.lua
--- Admin commands untuk sistem ALTAX
-
 local ESX = exports['es_extended']:getSharedObject()
 
--- Command admin untuk melihat dan mengatur pajak player
 ESX.RegisterCommand('tax', 'admin', function(xPlayer, args, showError)
     local action = args.action
     
@@ -22,7 +18,6 @@ ESX.RegisterCommand('tax', 'admin', function(xPlayer, args, showError)
             return
         end
         
-        -- Dapatkan info pajak player
         GetPlayerTaxInfo(xPlayer, xTarget)
     elseif action == 'set' then
         local targetId = args.playerId
@@ -41,7 +36,6 @@ ESX.RegisterCommand('tax', 'admin', function(xPlayer, args, showError)
             return
         end
         
-        -- Set pajak player
         SetPlayerTax(xPlayer, xTarget, taxType, amount)
     elseif action == 'exempt' then
         local targetId = args.playerId
@@ -59,7 +53,6 @@ ESX.RegisterCommand('tax', 'admin', function(xPlayer, args, showError)
             return
         end
         
-        -- Bebaskan player dari pajak
         ExemptPlayerFromTax(xPlayer, xTarget, taxType)
     elseif action == 'collect' then
         local targetId = args.playerId
@@ -76,7 +69,6 @@ ESX.RegisterCommand('tax', 'admin', function(xPlayer, args, showError)
             return
         end
         
-        -- Kumpulkan pajak dari player
         CollectPlayerTaxManually(xPlayer, xTarget)
     elseif action == 'incentive' then
         local targetId = args.playerId
@@ -95,10 +87,8 @@ ESX.RegisterCommand('tax', 'admin', function(xPlayer, args, showError)
             return
         end
         
-        -- Tambahkan insentif pajak
         AddTaxIncentiveManually(xPlayer, xTarget, incentiveType, value)
     elseif action == 'stats' then
-        -- Tampilkan statistik pajak global
         ShowTaxStats(xPlayer)
     else
         showError('Tindakan tidak valid. Gunakan: info, set, exempt, collect, incentive, stats')
@@ -112,12 +102,9 @@ end, true, {help = 'Manajemen pajak player', validate = true, arguments = {
     {name = 'value', help = 'Nilai untuk insentif', type = 'any', optional = false}
 }})
 
--- Command untuk player untuk melihat info pajak mereka
 ESX.RegisterCommand('mytax', 'user', function(xPlayer, args, showError)
-    -- Dapatkan info pajak
     local identifier = xPlayer.identifier
     
-    -- Dapatkan catatan pajak
     local result = MySQL.query.await('SELECT * FROM altax_records WHERE identifier = ?', {
         identifier
     })
@@ -130,15 +117,10 @@ ESX.RegisterCommand('mytax', 'user', function(xPlayer, args, showError)
         local overdueAmount = taxRecord.overdue_amount or 0
         local lateFees = taxRecord.late_fees or 0
         local nextTaxDate = taxRecord.next_tax_date
-        
-        -- Hitung perkiraan pajak berikutnya
         local money = xPlayer.getAccount('bank').money
         local estimatedTax = math.floor(money * (taxRate / 100))
-        
-        -- Format tanggal berikutnya
         local nextTaxDateFormatted = os.date('%d/%m/%Y', ConvertMySQLTimeToTimestamp(nextTaxDate))
         
-        -- Tampilkan informasi
         TriggerClientEvent('chat:addMessage', xPlayer.source, {
             color = {255, 255, 0},
             multiline = true,
@@ -150,10 +132,8 @@ ESX.RegisterCommand('mytax', 'user', function(xPlayer, args, showError)
                    'Tanggal Pajak Berikutnya: ' .. nextTaxDateFormatted}
         })
         
-        -- Dapatkan info pajak kendaraan
         GetPlayerVehicleTaxInfo(xPlayer)
         
-        -- Dapatkan info pajak properti
         GetPlayerPropertyTaxInfo(xPlayer)
     else
         TriggerClientEvent('chat:addMessage', xPlayer.source, {
@@ -162,12 +142,8 @@ ESX.RegisterCommand('mytax', 'user', function(xPlayer, args, showError)
         })
     end
 end, false, {help = 'Lihat informasi pajak Anda'})
-
--- Command untuk player untuk membayar pajak tertunggak
 ESX.RegisterCommand('paytax', 'user', function(xPlayer, args, showError)
     local identifier = xPlayer.identifier
-    
-    -- Dapatkan jumlah tertunggak
     local result = MySQL.query.await('SELECT overdue_amount, late_fees FROM altax_records WHERE identifier = ?', {
         identifier
     })
@@ -184,8 +160,6 @@ ESX.RegisterCommand('paytax', 'user', function(xPlayer, args, showError)
             })
             return
         end
-        
-        -- Cek apakah ada program amnesti
         local amnestyDiscount = 0
         if exports.altax:IsAmnestyActive() then
             amnestyDiscount = exports.altax:GetAmnestyDiscount()
@@ -200,23 +174,17 @@ ESX.RegisterCommand('paytax', 'user', function(xPlayer, args, showError)
                 })
             end
         end
-        
-        -- Cek apakah player punya cukup uang
         local money = xPlayer.getAccount('bank').money
         
         if money >= totalOverdue then
-            -- Ambil uang dan bersihkan pajak tertunggak
             xPlayer.removeAccountMoney('bank', totalOverdue)
             
             MySQL.update('UPDATE altax_records SET overdue_amount = 0, late_fees = 0 WHERE identifier = ?', {
                 identifier
             })
             
-            -- Catat pembayaran
             local receiptId = GenerateReceiptId(identifier)
             RecordTaxPayment(identifier, totalOverdue, 'overdue', 'bank', receiptId)
-            
-            -- Transfer ke akun pemerintah
             local governmentAccount = Config.TaxRevenueAccount
             if governmentAccount then
                 TriggerEvent('esx_addonaccount:getSharedAccount', governmentAccount, function(account)
@@ -226,9 +194,7 @@ ESX.RegisterCommand('paytax', 'user', function(xPlayer, args, showError)
                 end)
             end
             
-            -- Jika amnesti diterapkan, catat
             if amnestyDiscount > 0 then
-                -- Catat penggunaan amnesti
                 exports.altax:RecordAmnestyUsage(identifier, overdueAmount + lateFees, totalOverdue - (overdueAmount + lateFees))
             end
             
@@ -250,13 +216,10 @@ ESX.RegisterCommand('paytax', 'user', function(xPlayer, args, showError)
     end
 end, false, {help = 'Bayar pajak tertunggak'})
 
--- Command admin untuk menjalankan proses pajak untuk semua player
 ESX.RegisterCommand('processtax', 'admin', function(xPlayer, args, showError)
-    -- Process tax for all players or specific ones
     local targetId = args.playerId
     
     if targetId then
-        -- Process tax for specific player
         local xTarget = ESX.GetPlayerFromId(targetId)
         
         if not xTarget then
@@ -266,7 +229,6 @@ ESX.RegisterCommand('processtax', 'admin', function(xPlayer, args, showError)
         
         CollectPlayerTaxManually(xPlayer, xTarget)
     else
-        -- Process tax for all online players
         local onlinePlayers = ESX.GetPlayers()
         
         if #onlinePlayers == 0 then
@@ -283,7 +245,6 @@ ESX.RegisterCommand('processtax', 'admin', function(xPlayer, args, showError)
             local xTarget = ESX.GetPlayerFromId(playerId)
             
             if xTarget then
-                -- Process tax for this player
                 exports.altax:ProcessTax(xTarget)
                 processedCount = processedCount + 1
             end
@@ -298,13 +259,10 @@ end, true, {help = 'Proses pajak untuk semua player atau player tertentu', valid
     {name = 'playerId', help = 'ID Player (opsional)', type = 'number', optional = true}
 }})
 
--- Functions for tax management
 
--- Get player tax info
 function GetPlayerTaxInfo(xAdmin, xTarget)
     local identifier = xTarget.identifier
     
-    -- Get tax record
     local result = MySQL.query.await('SELECT * FROM altax_records WHERE identifier = ?', {
         identifier
     })
@@ -319,21 +277,16 @@ function GetPlayerTaxInfo(xAdmin, xTarget)
         local nextTaxDate = taxRecord.next_tax_date
         local incentives = taxRecord.tax_incentives
         
-        -- Format next tax date
         local nextTaxDateFormatted = os.date('%d/%m/%Y', ConvertMySQLTimeToTimestamp(nextTaxDate))
         
-        -- Get vehicle count
         local vehicleCount = exports.altax:GetPlayerVehicleCount(identifier)
         
-        -- Get property count
         local propertyCount = GetPlayerPropertyCount(identifier)
         
-        -- Calculate estimated next tax
         local money = xTarget.getAccount('bank').money
         local cash = xTarget.getMoney()
         local estimatedTax = exports.altax:CalculatePlayerTax(xTarget)
         
-        -- Display info
         TriggerClientEvent('chat:addMessage', xAdmin.source, {
             color = {255, 255, 0},
             multiline = true,
@@ -356,12 +309,10 @@ function GetPlayerTaxInfo(xAdmin, xTarget)
     end
 end
 
--- Set player tax
 function SetPlayerTax(xAdmin, xTarget, taxType, amount)
     local identifier = xTarget.identifier
     
     if taxType == 'income' then
-        -- Set income tax rate
         local result = MySQL.query.await('SELECT * FROM altax_records WHERE identifier = ?', {
             identifier
         })
@@ -388,9 +339,8 @@ function SetPlayerTax(xAdmin, xTarget, taxType, amount)
             })
         end
     elseif taxType == 'property' then
-        -- Set property tax multiplier for all properties
         MySQL.update('UPDATE altax_property_tax SET tax_multiplier = ? WHERE owner = ?', {
-            amount / 100, -- Convert percentage to multiplier
+            amount / 100,
             identifier
         })
         
@@ -399,9 +349,8 @@ function SetPlayerTax(xAdmin, xTarget, taxType, amount)
             args = {'[ALTAX]', 'Pengali pajak properti untuk ' .. GetPlayerName(xTarget.source) .. ' disetel ke ' .. amount .. '%'}
         })
     elseif taxType == 'vehicle' then
-        -- Set vehicle tax multiplier for all vehicles
         MySQL.update('UPDATE altax_vehicle_tax SET tax_multiplier = ? WHERE owner = ?', {
-            amount / 100, -- Convert percentage to multiplier
+            amount / 100, 
             identifier
         })
         
@@ -410,7 +359,6 @@ function SetPlayerTax(xAdmin, xTarget, taxType, amount)
             args = {'[ALTAX]', 'Pengali pajak kendaraan untuk ' .. GetPlayerName(xTarget.source) .. ' disetel ke ' .. amount .. '%'}
         })
     elseif taxType == 'overdue' then
-        -- Set overdue amount
         MySQL.update('UPDATE altax_records SET overdue_amount = ? WHERE identifier = ?', {
             amount,
             identifier
@@ -421,9 +369,6 @@ function SetPlayerTax(xAdmin, xTarget, taxType, amount)
             args = {'[ALTAX]', 'Jumlah pajak tertunggak untuk ' .. GetPlayerName(xTarget.source) .. ' disetel ke $' .. ESX.Math.GroupDigits(amount)}
         })
     elseif taxType == 'bracket' then
-        -- Set tax bracket manually
-        
-        -- Find bracket with this index
         if amount > 0 and amount <= #Config.IncomeTaxBrackets then
             local bracket = Config.IncomeTaxBrackets[amount]
             
@@ -444,7 +389,6 @@ function SetPlayerTax(xAdmin, xTarget, taxType, amount)
             })
         end
     elseif taxType == 'next' then
-        -- Set next tax date (amount in days from now)
         
         MySQL.update('UPDATE altax_records SET next_tax_date = DATE_ADD(NOW(), INTERVAL ? DAY) WHERE identifier = ?', {
             amount,
@@ -463,12 +407,10 @@ function SetPlayerTax(xAdmin, xTarget, taxType, amount)
     end
 end
 
--- Exempt player from tax
 function ExemptPlayerFromTax(xAdmin, xTarget, taxType)
     local identifier = xTarget.identifier
     
     if taxType == 'income' then
-        -- Exempt from income tax
         MySQL.update('UPDATE altax_records SET tax_rate = 0 WHERE identifier = ?', {
             identifier
         })
@@ -478,7 +420,6 @@ function ExemptPlayerFromTax(xAdmin, xTarget, taxType)
             args = {'[ALTAX]', GetPlayerName(xTarget.source) .. ' dibebaskan dari pajak penghasilan'}
         })
     elseif taxType == 'property' then
-        -- Exempt from property tax
         MySQL.update('UPDATE altax_property_tax SET tax_exemption = 1 WHERE owner = ?', {
             identifier
         })
@@ -488,7 +429,6 @@ function ExemptPlayerFromTax(xAdmin, xTarget, taxType)
             args = {'[ALTAX]', GetPlayerName(xTarget.source) .. ' dibebaskan dari pajak properti'}
         })
     elseif taxType == 'vehicle' then
-        -- Exempt from vehicle tax
         MySQL.update('UPDATE altax_vehicle_tax SET tax_exemption = 1 WHERE owner = ?', {
             identifier
         })
@@ -498,7 +438,6 @@ function ExemptPlayerFromTax(xAdmin, xTarget, taxType)
             args = {'[ALTAX]', GetPlayerName(xTarget.source) .. ' dibebaskan dari pajak kendaraan'}
         })
     elseif taxType == 'all' then
-        -- Exempt from all taxes
         MySQL.update('UPDATE altax_records SET tax_rate = 0 WHERE identifier = ?', {
             identifier
         })
@@ -516,7 +455,6 @@ function ExemptPlayerFromTax(xAdmin, xTarget, taxType)
             args = {'[ALTAX]', GetPlayerName(xTarget.source) .. ' dibebaskan dari semua pajak'}
         })
     elseif taxType == 'overdue' then
-        -- Clear overdue taxes
         MySQL.update('UPDATE altax_records SET overdue_amount = 0, late_fees = 0 WHERE identifier = ?', {
             identifier
         })
@@ -533,9 +471,7 @@ function ExemptPlayerFromTax(xAdmin, xTarget, taxType)
     end
 end
 
--- Collect tax manually from player
 function CollectPlayerTaxManually(xAdmin, xTarget)
-    -- Process tax for player
     exports.altax:ProcessTax(xTarget)
     
     TriggerClientEvent('chat:addMessage', xAdmin.source, {
@@ -544,12 +480,10 @@ function CollectPlayerTaxManually(xAdmin, xTarget)
     })
 end
 
--- Add tax incentive manually
 function AddTaxIncentiveManually(xAdmin, xTarget, incentiveType, value)
     local identifier = xTarget.identifier
     
     if incentiveType == 'charity' then
-        -- Add charity donation incentive
         exports.altax:AddTaxIncentive(xTarget.source, 'charityDonation', value or 10000)
         
         TriggerClientEvent('chat:addMessage', xAdmin.source, {
@@ -557,7 +491,6 @@ function AddTaxIncentiveManually(xAdmin, xTarget, incentiveType, value)
             args = {'[ALTAX]', 'Insentif donasi amal sebesar $' .. ESX.Math.GroupDigits(value or 10000) .. ' ditambahkan untuk ' .. GetPlayerName(xTarget.source)}
         })
     elseif incentiveType == 'green' then
-        -- Add green vehicle incentive
         exports.altax:AddTaxIncentive(xTarget.source, 'greenVehicle', true)
         
         TriggerClientEvent('chat:addMessage', xAdmin.source, {
@@ -565,7 +498,6 @@ function AddTaxIncentiveManually(xAdmin, xTarget, incentiveType, value)
             args = {'[ALTAX]', 'Insentif kendaraan ramah lingkungan ditambahkan untuk ' .. GetPlayerName(xTarget.source)}
         })
     elseif incentiveType == 'police' then
-        -- Add police cooperation incentive
         exports.altax:AddTaxIncentive(xTarget.source, 'policeCooperation', true)
         
         TriggerClientEvent('chat:addMessage', xAdmin.source, {
@@ -580,13 +512,10 @@ function AddTaxIncentiveManually(xAdmin, xTarget, incentiveType, value)
     end
 end
 
--- Show global tax stats
 function ShowTaxStats(xAdmin)
-    -- Get total tax collected
     local totalResult = MySQL.query.await('SELECT SUM(total_tax_paid) as total FROM altax_records')
     local totalTaxPaid = totalResult and totalResult[1].total or 0
     
-    -- Get count of taxpayers by bracket
     local bracketCounts = {}
     local brackets = MySQL.query.await('SELECT tax_bracket, COUNT(*) as count FROM altax_records GROUP BY tax_bracket')
     
@@ -596,15 +525,12 @@ function ShowTaxStats(xAdmin)
         end
     end
     
-    -- Get total overdue amount
     local overdueResult = MySQL.query.await('SELECT SUM(overdue_amount) as overdue, SUM(late_fees) as fees FROM altax_records')
     local totalOverdue = (overdueResult and overdueResult[1].overdue or 0) + (overdueResult and overdueResult[1].fees or 0)
     
-    -- Get count of vehicles and properties
     local vehicleCount = MySQL.query.await('SELECT COUNT(*) as count FROM altax_vehicle_tax')
     local propertyCount = MySQL.query.await('SELECT COUNT(*) as count FROM altax_property_tax')
     
-    -- Format message
     local message = 'Statistik Pajak Global:\n' ..
                     'Total Pajak Terkumpul: $' .. ESX.Math.GroupDigits(totalTaxPaid) .. '\n' ..
                     'Total Pajak Tertunggak: $' .. ESX.Math.GroupDigits(totalOverdue) .. '\n' ..
@@ -612,7 +538,6 @@ function ShowTaxStats(xAdmin)
                     'Jumlah Properti Terdaftar: ' .. (propertyCount and propertyCount[1].count or 0) .. '\n\n' ..
                     'Pembagian Wajib Pajak:\n'
     
-    -- Add bracket counts
     for _, bracket in ipairs(Config.IncomeTaxBrackets) do
         local count = bracketCounts[bracket.name] or 0
         message = message .. bracket.name .. ': ' .. count .. '\n'
@@ -625,7 +550,6 @@ function ShowTaxStats(xAdmin)
     })
 end
 
--- Helper function to convert MySQL timestamp to Lua timestamp
 function ConvertMySQLTimeToTimestamp(mysqlTime)
     local pattern = "(%d+)-(%d+)-(%d+) (%d+):(%d+):(%d+)"
     local year, month, day, hour, min, sec = mysqlTime:match(pattern)
@@ -640,14 +564,12 @@ function ConvertMySQLTimeToTimestamp(mysqlTime)
     })
 end
 
--- Helper function for generating receipt ID
 function GenerateReceiptId(identifier)
     local timestamp = os.time()
     local randomPart = math.random(10000, 99999)
     return string.format('TX-%s-%d-%d', string.sub(identifier, -5), timestamp, randomPart)
 end
 
--- Helper function to record tax payment
 function RecordTaxPayment(identifier, amount, taxType, paymentMethod, receiptId)
     MySQL.insert('INSERT INTO altax_payments (identifier, amount, tax_type, payment_method, receipt_id, tax_period_start, tax_period_end) VALUES (?, ?, ?, ?, ?, DATE_SUB(NOW(), INTERVAL ? DAY), NOW())', {
         identifier,
@@ -659,7 +581,6 @@ function RecordTaxPayment(identifier, amount, taxType, paymentMethod, receiptId)
     })
 end
 
--- Helper function to get player property count
 function GetPlayerPropertyCount(identifier)
     local result = MySQL.query.await('SELECT COUNT(*) as count FROM altax_property_tax WHERE owner = ?', {
         identifier
@@ -672,11 +593,9 @@ function GetPlayerPropertyCount(identifier)
     return 0
 end
 
--- Get vehicle tax info for player
 function GetPlayerVehicleTaxInfo(xPlayer)
     local identifier = xPlayer.identifier
     
-    -- Get vehicles
     local vehicles = exports.altax:GetPlayerVehicles(identifier)
     
     if vehicles and #vehicles > 0 then
@@ -714,11 +633,9 @@ function GetPlayerVehicleTaxInfo(xPlayer)
     end
 end
 
--- Get property tax info for player
 function GetPlayerPropertyTaxInfo(xPlayer)
     local identifier = xPlayer.identifier
     
-    -- Get properties
     local properties = MySQL.query.await('SELECT * FROM altax_property_tax WHERE owner = ?', {
         identifier
     })
@@ -760,7 +677,6 @@ function GetPlayerPropertyTaxInfo(xPlayer)
     end
 end
 
--- Helper function to calculate vehicle tax amount
 function CalculateVehicleTaxAmount(taxData)
     if not taxData or taxData.tax_exemption == 1 then
         return 0
@@ -769,24 +685,20 @@ function CalculateVehicleTaxAmount(taxData)
     local purchasePrice = taxData.purchase_price or 0
     local taxMultiplier = taxData.tax_multiplier or 1.0
     
-    -- Get vehicle class
     local vehicleModel = taxData.vehicle_model
     local vehClass = GetVehicleClassFromModel(vehicleModel)
     local classMultiplier = Config.VehicleClasses[vehClass] and Config.VehicleClasses[vehClass].taxMultiplier or 1.0
     
-    -- Calculate age discount
     local purchaseDate = taxData.purchase_date
     local vehicleAge = CalculateVehicleAge(purchaseDate)
     local ageDiscount = math.min(0.5, vehicleAge * Config.VehicleAgeTaxDiscount) -- Max 50% discount
     
-    -- Calculate tax
     local baseTax = math.floor(purchasePrice * (Config.VehicleTaxBaseRate / 100))
     local finalTax = math.floor(baseTax * classMultiplier * taxMultiplier * (1 - ageDiscount))
     
     return finalTax
 end
 
--- Helper to calculate vehicle age
 function CalculateVehicleAge(purchaseDate)
     local purchaseTimestamp = os.time(os.date('*t', purchaseDate))
     local currentTimestamp = os.time()
@@ -796,10 +708,7 @@ function CalculateVehicleAge(purchaseDate)
     return math.floor(ageInYears)
 end
 
--- Helper function to get vehicle class from model
 function GetVehicleClassFromModel(model)
-    -- Implementation should be adapted to how the server stores vehicle classes
-    -- This is just a simple example
     
     local sportsCars = {
         adder = true, t20 = true, zentorno = true, turismor = true,
@@ -816,13 +725,12 @@ function GetVehicleClassFromModel(model)
         fugitive = true, glendale = true, ingot = true, intruder = true
     }
     
-    -- Model to lowercase for consistent comparison
     model = string.lower(tostring(model))
     
     -- Check vehicle class
-    if sportsCars[model] then return 6 -- Sports
-    elseif suv[model] then return 2 -- SUVs
-    elseif sedans[model] then return 1 -- Sedans
-    else return 1 -- Default to sedans if unknown
+    if sportsCars[model] then return 6 
+    elseif suv[model] then return 2 
+    elseif sedans[model] then return 1 
+    else return 1 
     end
 end
