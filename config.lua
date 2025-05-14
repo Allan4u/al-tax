@@ -1,33 +1,29 @@
 Config = {}
 
--- Settings umum
-Config.Debug = false -- Set ke true untuk logging debug
-Config.Locale = 'id' -- en atau id
-Config.NotifyType = 'esx' -- 'esx', 'mythic', 'pnotify'
+Config.Debug = false 
+Config.Locale = 'id' 
+Config.NotifyType = 'esx' 
 
--- Pengaturan waktu (untuk pajak otomatis)
-Config.TaxInterval = 7 -- Jumlah hari antara pembayaran pajak (setiap 7 hari)
-Config.TimeZone = 'Asia/Jakarta' -- Timezone Indonesia
-Config.TaxCollectionHour = 6 -- Jam pengumpulan pajak (pagi hari)
+Config.TaxInterval = 7 
+Config.TimeZone = 'Asia/Jakarta' 
+Config.TaxCollectionHour = 6 
 
 -- Pembayaran pajak
-Config.AllowCashPayment = true -- Izinkan pembayaran dari uang cash jika uang bank tidak cukup
-Config.GracePeriod = 3 -- Jumlah hari untuk membayar pajak setelah waktu jatuh tempo
-Config.LateFeePercentage = 10 -- Persentase denda untuk terlambat bayar pajak
+Config.AllowCashPayment = true -
+Config.GracePeriod = 3 
+Config.LateFeePercentage = 10 
 
 -- Pembebasan pajak
-Config.MinimumTaxableIncome = 5000 -- Penghasilan minimum yang kena pajak
-Config.ExemptJobs = { -- Pekerjaan yang bebas dari beberapa atau semua pajak 
+Config.MinimumTaxableIncome = 5000 
+Config.ExemptJobs = { 
     ['police'] = { income = true, property = false, vehicle = false },
     ['ambulance'] = { income = true, property = false, vehicle = false },
     ['mechanic'] = { income = false, property = false, vehicle = true }
 }
 
--- SMS notifikasi
-Config.SendSMSNotification = true -- Kirim SMS pemberitahuan tentang pajak
+Config.SendSMSNotification = true 
 Config.TaxServiceNumber = 'PAJAK-ID'
 
--- Kategori pendapatan dan tarif pajak (progressive tax)
 Config.IncomeTaxBrackets = {
     { name = 'Sangat Miskin', minMoney = 0, maxMoney = 50000, taxRate = 2 },
     { name = 'Miskin', minMoney = 50001, maxMoney = 150000, taxRate = 5 },
@@ -40,7 +36,7 @@ Config.IncomeTaxBrackets = {
 
 -- Pajak properti
 Config.PropertyTaxEnabled = true
-Config.PropertyTaxRate = 3 -- Persentase dari nilai properti yang dibayarkan setiap periode pajak
+Config.PropertyTaxRate = 3
 Config.PropertyTypes = {
     ['apartment'] = { taxMultiplier = 1.0 },
     ['house'] = { taxMultiplier = 1.2 },
@@ -50,9 +46,9 @@ Config.PropertyTypes = {
 
 -- Pajak kendaraan
 Config.VehicleTaxEnabled = true
-Config.VehicleTaxBaseRate = 2 -- Persentase dari nilai kendaraan untuk pajak dasar
-Config.VehicleCountTaxMultiplier = 0.5 -- Tambahan persentase pajak untuk setiap kendaraan tambahan
-Config.VehicleAgeTaxDiscount = 0.1 -- Pengurangan persentase pajak untuk setiap tahun umur kendaraan
+Config.VehicleTaxBaseRate = 2
+Config.VehicleCountTaxMultiplier = 0.5 
+Config.VehicleAgeTaxDiscount = 0.1 
 Config.VehicleClasses = {
     [0] = { name = 'Compacts', taxMultiplier = 0.8 },
     [1] = { name = 'Sedans', taxMultiplier = 1.0 },
@@ -80,20 +76,19 @@ Config.VehicleClasses = {
 
 -- Program Amnesti Pajak
 Config.TaxAmnestyEnabled = true
-Config.TaxAmnestyDiscount = 50 -- Persentase diskon untuk pembayaran pajak tertunggak
-Config.TaxAmnestyDuration = 3 -- Durasi program amnesti dalam hari
+Config.TaxAmnestyDiscount = 50 
+Config.TaxAmnestyDuration = 3
 
 -- Insentif pajak
 Config.TaxIncentives = {
-    charityDonation = { multiplier = 0.5, maxDeduction = 10000 }, -- 50% dari donasi amal dikurangkan dari pajak
-    greenVehicle = { deduction = 5 }, -- Pengurangan 5% untuk kendaraan ramah lingkungan
-    policeCooperation = { deduction = 10 } -- Pengurangan 10% untuk informan polisi
+    charityDonation = { multiplier = 0.5, maxDeduction = 10000 }, 
+    greenVehicle = { deduction = 5 }, 
+    policeCooperation = { deduction = 10 } 
 }
 
--- Account untuk penerimaan pajak
-Config.TaxRevenueAccount = 'society_government' -- Akun masyarakat yang menerima uang pajak
+Config.TaxRevenueAccount = 'society_government' 
 
--- Distribusi pendapatan pajak (untuk feature tax distribution)
+
 Config.TaxDistribution = {
     government = 50, -- 50% masuk ke pemerintah pusat
     police = 20, -- 20% untuk pendanaan kepolisian
