@@ -114,31 +114,6 @@ ALTAX is designed to be easily expandable:
 
 ### Credits
 
-Created by Claude to meet the needs of Indonesian RP servers.
+Created by Allan
 
 © 2025 ALTAX Tax System
-
-
-
-
-
-Create a job script with the trigger name aljob
-1. Use the ESX framework
-2. Create the config.lua file
-3. The job must include: Cow milk collection, Chicken butchering, Lumberjacking, Mining, Tailoring, Farming, Oil extraction
-4. All jobs must have processes, such as chicken butchering requiring live chicken collection, then butchering and packaging the chicken, and the same for all other jobs
-5. Make all jobs have simple minigames
-6. Create menus using ox_lib and integrate with ox_target for locations
-7. Create a menu to end the job as well
-8. Create blips for collection points, initial processes, and final processes for each job
-9. Create coordinates for selling all final products from the jobs and sold items go into the stash that already exists in ox_inventory
-10. Add your own good and interesting features
-11. Make it so when selling goods, money is reduced from society_pemkot and transferred to the player
-12. Create a single sales location/coordinate
-13. The stash must be named according to the stash in config.lua
-14. Make it so when a player disconnects or leaves the server after 1 hour, they must take the job again
-15. For farming process, must include buying seeds, planting, harvesting, washing, and packaging vegetables
-16. Vegetables should be differentiated into carrots, tomatoes, peppers, bananas, tea, rice, sugar cane, oranges, and add others
-17. Make it so sales prices can be configured in config.lua
-18. Make the mining process include getting rocks, washing rocks, smelting rocks, and after rocks are smelted, obtaining items such as ruby, diamond, iron, gold, copper and others
-19. Make everything neat and well-organized
