@@ -1,16 +1,13 @@
--- server/taxamnesty.lua
--- Program Amnesti Pajak untuk sistem ALTAX
 
 local ESX = exports['es_extended']:getSharedObject()
 local activeAmnesty = nil
 
--- Inisialisasi amnesti pajak
+
 Citizen.CreateThread(function()
     InitializeAmnestySystem()
 end)
 
 function InitializeAmnestySystem()
-    -- Buat tabel untuk amnesti pajak jika belum ada
     MySQL.query.await([[
         CREATE TABLE IF NOT EXISTS `altax_amnesty` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -25,7 +22,7 @@ function InitializeAmnestySystem()
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ]])
     
-    -- Cek apakah ada program amnesti aktif
+
     local result = MySQL.query.await('SELECT * FROM altax_amnesty WHERE active = 1 AND end_date > NOW() LIMIT 1')
     
     if result and #result > 0 then
@@ -34,22 +31,22 @@ function InitializeAmnestySystem()
     end
 end
 
--- Fungsi untuk memulai program amnesti pajak
+
 function StartTaxAmnesty(name, description, discountPercentage, durationDays, createdBy)
-    -- Default values jika tidak disediakan
+
     name = name or 'Tax Amnesty Program'
     description = description or 'Pay your overdue taxes with a discount'
     discountPercentage = discountPercentage or Config.TaxAmnestyDiscount
     durationDays = durationDays or Config.TaxAmnestyDuration
     
-    -- Hitung tanggal mulai dan berakhir
+    
     local startDate = os.date('%Y-%m-%d %H:%M:%S')
     local endDate = os.date('%Y-%m-%d %H:%M:%S', os.time() + (durationDays * 86400))
     
-    -- Nonaktifkan program amnesti yang sedang berjalan jika ada
+   
     MySQL.update('UPDATE altax_amnesty SET active = 0 WHERE active = 1')
     
-    -- Buat program amnesti baru
+   
     local id = MySQL.insert.await('INSERT INTO altax_amnesty (name, description, discount_percentage, start_date, end_date, active, created_by) VALUES (?, ?, ?, ?, ?, 1, ?)', {
         name,
         description,
@@ -58,8 +55,7 @@ function StartTaxAmnesty(name, description, discountPercentage, durationDays, cr
         endDate,
         createdBy
     })
-    
-    -- Simpan data amnesti aktif
+
     activeAmnesty = {
         id = id,
         name = name,
@@ -71,7 +67,7 @@ function StartTaxAmnesty(name, description, discountPercentage, durationDays, cr
         created_by = createdBy
     }
     
-    -- Umumkan ke semua player
+    
     TriggerClientEvent('altax:amnestyAnnouncement', -1, {
         name = name,
         description = description,
@@ -82,9 +78,9 @@ function StartTaxAmnesty(name, description, discountPercentage, durationDays, cr
     return id
 end
 
--- Fungsi untuk mengakhiri program amnesti pajak
+
 function EndTaxAmnesty(amnestyId)
-    -- Jika ID tidak disediakan, akhiri semua program amnesti yang aktif
+
     if not amnestyId and activeAmnesty then
         amnestyId = activeAmnesty.id
     end
@@ -105,16 +101,14 @@ function EndTaxAmnesty(amnestyId)
     return false
 end
 
--- Fungsi untuk cek apakah amnesti pajak aktif
+
 function IsAmnestyActive()
-    -- Pertama cek cache
     if activeAmnesty then
-        -- Cek apakah masih valid berdasarkan tanggal
+
         local currentTime = os.time()
         local endTime = ConvertMySQLTimeToTimestamp(activeAmnesty.end_date)
         
         if currentTime > endTime then
-            -- Amnesti sudah berakhir, nonaktifkan
             EndTaxAmnesty(activeAmnesty.id)
             return false
         end
@@ -122,7 +116,6 @@ function IsAmnestyActive()
         return true
     end
     
-    -- Jika tidak ada di cache, cek database
     local result = MySQL.query.await('SELECT * FROM altax_amnesty WHERE active = 1 AND end_date > NOW() LIMIT 1')
     
     if result and #result > 0 then
@@ -133,7 +126,6 @@ function IsAmnestyActive()
     return false
 end
 
--- Fungsi untuk mendapatkan diskon amnesti saat ini
 function GetAmnestyDiscount()
     if IsAmnestyActive() then
         return activeAmnesty.discount_percentage
@@ -142,7 +134,6 @@ function GetAmnestyDiscount()
     return 0
 end
 
--- Fungsi untuk mendapatkan info program amnesti saat ini
 function GetActiveAmnestyInfo()
     if IsAmnestyActive() then
         return activeAmnesty
@@ -151,13 +142,11 @@ function GetActiveAmnestyInfo()
     return nil
 end
 
--- Fungsi untuk menerapkan amnesti pada pajak yang tertunggak
 function ApplyAmnestyToOverdueTax(xPlayer)
     if not xPlayer or not IsAmnestyActive() then return 0 end
     
     local identifier = xPlayer.identifier
     
-    -- Dapatkan pajak tertunggak
     local result = MySQL.query.await('SELECT overdue_amount, late_fees FROM altax_records WHERE identifier = ?', {
         identifier
     })
@@ -169,17 +158,14 @@ function ApplyAmnestyToOverdueTax(xPlayer)
         
         if totalOverdue <= 0 then return 0 end
         
-        -- Hitung diskon
         local discountAmount = math.floor(totalOverdue * (activeAmnesty.discount_percentage / 100))
         local amountAfterDiscount = totalOverdue - discountAmount
         
-        -- Perbarui jumlah tertunggak
         MySQL.update('UPDATE altax_records SET overdue_amount = ?, late_fees = 0 WHERE identifier = ?', {
             amountAfterDiscount,
             identifier
         })
         
-        -- Catat penggunaan amnesti
         RecordAmnestyUsage(identifier, totalOverdue, discountAmount)
         
         return discountAmount
@@ -188,7 +174,6 @@ function ApplyAmnestyToOverdueTax(xPlayer)
     return 0
 end
 
--- Fungsi untuk mencatat penggunaan amnesti
 function RecordAmnestyUsage(identifier, originalAmount, discountAmount)
     if not activeAmnesty then return end
     
@@ -200,7 +185,6 @@ function RecordAmnestyUsage(identifier, originalAmount, discountAmount)
     })
 end
 
--- Helper function untuk mengkonversi MySQL timestamp ke Lua timestamp
 function ConvertMySQLTimeToTimestamp(mysqlTime)
     local pattern = "(%d+)-(%d+)-(%d+) (%d+):(%d+):(%d+)"
     local year, month, day, hour, min, sec = mysqlTime:match(pattern)
@@ -215,7 +199,6 @@ function ConvertMySQLTimeToTimestamp(mysqlTime)
     })
 end
 
--- Handler untuk event client yang meminta amnesti
 RegisterServerEvent('altax:requestAmnesty')
 AddEventHandler('altax:requestAmnesty', function()
     local source = source
@@ -236,7 +219,6 @@ AddEventHandler('altax:requestAmnesty', function()
     end
 end)
 
--- Command untuk admin untuk mengatur amnesti pajak
 ESX.RegisterCommand('taxamnesty', 'admin', function(xPlayer, args, showError)
     local action = args.action
     
@@ -293,7 +275,6 @@ end, true, {help = 'Manajemen program amnesti pajak', validate = true, arguments
     {name = 'duration', help = 'Durasi dalam hari (untuk start)', type = 'number', optional = true}
 }})
 
--- Buat tabel untuk mencatat penggunaan amnesti pajak
 Citizen.CreateThread(function()
     MySQL.query.await([[
         CREATE TABLE IF NOT EXISTS `altax_amnesty_usage` (
@@ -308,7 +289,6 @@ Citizen.CreateThread(function()
     ]])
 end)
 
--- Export fungsi amnesti untuk penggunaan resource lain
 exports('StartTaxAmnesty', StartTaxAmnesty)
 exports('EndTaxAmnesty', EndTaxAmnesty)
 exports('IsAmnestyActive', IsAmnestyActive)
