@@ -1,21 +1,15 @@
--- client/main.lua
--- Client-side main file for ALTAX tax system
-
 ESX = exports['es_extended']:getSharedObject()
 
--- Local variables
 local isShowingTaxUI = false
 local currentTaxInfo = nil
 local isBeingAudited = false
 
--- Display a notification when taxes are collected
 RegisterNetEvent('altax:taxCollected')
 AddEventHandler('altax:taxCollected', function(amount, source)
     local message = _U('tax_collected', ESX.Math.GroupDigits(amount))
     ShowNotification(message)
 end)
 
--- Display a notification when taxes are collected from cash
 RegisterNetEvent('altax:taxCollectedCash')
 AddEventHandler('altax:taxCollectedCash', function(totalAmount, bankAmount, cashAmount)
     local message = _U('tax_collected', ESX.Math.GroupDigits(bankAmount))
@@ -25,7 +19,6 @@ AddEventHandler('altax:taxCollectedCash', function(totalAmount, bankAmount, cash
     ShowNotification(cashMessage)
 end)
 
--- Display a warning when taxes are due soon
 RegisterNetEvent('altax:taxDueWarning')
 AddEventHandler('altax:taxDueWarning', function(amount, days)
     local message = _U('tax_due_soon', ESX.Math.GroupDigits(amount), days)
@@ -34,7 +27,6 @@ AddEventHandler('altax:taxDueWarning', function(amount, days)
     TriggerEvent('altax:displayTaxWarningUI', amount, days)
 end)
 
--- Display notification about overdue taxes
 RegisterNetEvent('altax:overdueNotice')
 AddEventHandler('altax:overdueNotice', function(amount)
     local message = _U('tax_overdue', ESX.Math.GroupDigits(amount), Config.LateFeePercentage)
@@ -43,28 +35,24 @@ AddEventHandler('altax:overdueNotice', function(amount)
     TriggerEvent('altax:displayOverdueUI', amount)
 end)
 
--- Display a notification about tax bracket
 RegisterNetEvent('altax:notifyTaxBracket')
 AddEventHandler('altax:notifyTaxBracket', function(bracketName, taxRate)
     local message = _U('tax_bracket', bracketName, taxRate)
     ShowNotification(message)
 end)
 
--- Display a notification when exempt from a tax type
 RegisterNetEvent('altax:taxExempt')
 AddEventHandler('altax:taxExempt', function(taxType)
     local message = _U('tax_exempt', taxType)
     ShowNotification(message)
 end)
 
--- Display a notification when not enough money for taxes
 RegisterNetEvent('altax:notEnoughMoney')
 AddEventHandler('altax:notEnoughMoney', function(amount, available)
     local message = _U('not_enough_money')
     ShowNotification(message)
 end)
 
--- Display the tax summary
 RegisterNetEvent('altax:taxSummary')
 AddEventHandler('altax:taxSummary', function(taxInfo)
     currentTaxInfo = taxInfo
@@ -100,11 +88,9 @@ AddEventHandler('altax:taxSummary', function(taxInfo)
     
     ShowAdvancedNotification('Tax Receipt', _U('tax_receipt', math.random(10000, 99999)), message, 'CHAR_BANK_MAZE', 9)
     
-    -- Display tax UI if enabled
     TriggerEvent('altax:displayTaxSummaryUI', taxInfo)
 end)
 
--- Tax incentive applied notification
 RegisterNetEvent('altax:incentiveApplied')
 AddEventHandler('altax:incentiveApplied', function(incentiveType, amount)
     local incentiveNames = {
@@ -119,7 +105,6 @@ AddEventHandler('altax:incentiveApplied', function(incentiveType, amount)
     ShowNotification(message)
 end)
 
--- Tax incentive added notification
 RegisterNetEvent('altax:incentiveAdded')
 AddEventHandler('altax:incentiveAdded', function(incentiveType)
     local incentiveNames = {
@@ -133,7 +118,6 @@ AddEventHandler('altax:incentiveAdded', function(incentiveType)
     ShowNotification('Insentif pajak baru ditambahkan: ' .. name)
 end)
 
--- Display next tax date
 RegisterNetEvent('altax:nextTaxDate')
 AddEventHandler('altax:nextTaxDate', function(date)
     local nextDate = FormatMySQLDate(date)
@@ -141,16 +125,13 @@ AddEventHandler('altax:nextTaxDate', function(date)
     ShowNotification(message)
 end)
 
--- Tax audit events
 RegisterNetEvent('altax:auditNotice')
 AddEventHandler('altax:auditNotice', function()
     local message = _U('audit_notice')
     ShowAdvancedNotification('Direktorat Pajak', 'Pemberitahuan Audit', message, 'CHAR_BANK_MAZE', 1)
     
-    -- Update audit status
     isBeingAudited = true
     
-    -- Send UI notification
     TriggerEvent('altax:displayAuditUI', true)
 end)
 
@@ -169,10 +150,8 @@ AddEventHandler('altax:auditComplete', function(auditResult)
     local message = _U('audit_complete', resultText)
     ShowAdvancedNotification('Direktorat Pajak', 'Hasil Audit', message, 'CHAR_BANK_MAZE', 1)
     
-    -- Update audit status
     isBeingAudited = false
     
-    -- Send UI notification
     TriggerEvent('altax:displayAuditUI', false, auditResult)
 end)
 
@@ -191,13 +170,11 @@ AddEventHandler('altax:updateAuditStatus', function(status)
     end
 end)
 
--- Tax amnesty events
 RegisterNetEvent('altax:amnestyAvailable')
 AddEventHandler('altax:amnestyAvailable', function(discountPercentage)
     local message = _U('amnesty_available', discountPercentage)
     ShowAdvancedNotification('Direktorat Pajak', 'Program Amnesti Pajak', message, 'CHAR_BANK_MAZE', 2)
-    
-    -- Send UI notification
+
     TriggerEvent('altax:displayAmnestyUI', discountPercentage)
 end)
 
@@ -215,7 +192,7 @@ AddEventHandler('altax:amnestyAnnouncement', function(amnestyInfo)
     
     ShowAdvancedNotification('Direktorat Pajak', amnestyInfo.name, message, 'CHAR_BANK_MAZE', 2)
     
-    -- Send UI notification
+
     TriggerEvent('altax:displayAmnestyUI', amnestyInfo.discount)
 end)
 
@@ -224,22 +201,18 @@ AddEventHandler('altax:amnestyEnded', function(name)
     local message = 'Program Amnesti Pajak "' .. name .. '" telah berakhir.'
     ShowAdvancedNotification('Direktorat Pajak', 'Amnesti Pajak Berakhir', message, 'CHAR_BANK_MAZE', 2)
     
-    -- Remove amnesty UI
     TriggerEvent('altax:hideAmnestyUI')
 end)
 
--- Send SMS notification
 RegisterNetEvent('altax:sendSMS')
 AddEventHandler('altax:sendSMS', function(sender, message)
     if Config.SendSMSNotification then
         TriggerEvent('esx_phone:send', sender, message)
-        -- Fallback for other phone resources
         TriggerEvent('gcPhone:sendMessage', sender, message)
         TriggerEvent('qs-smartphone:sendMessage', sender, message)
     end
 end)
 
--- Receipt event
 RegisterNetEvent('altax:showReceipt')
 AddEventHandler('altax:showReceipt', function(receiptData)
     if not receiptData then return end
@@ -256,7 +229,6 @@ AddEventHandler('altax:showReceipt', function(receiptData)
     ShowAdvancedNotification('Direktorat Pajak', 'Tanda Terima Pajak', message, 'CHAR_BANK_MAZE', 9)
 end)
 
--- Format MySQL date for display
 function FormatMySQLDate(mysqlDate)
     if not mysqlDate then return 'N/A' end
     
@@ -268,20 +240,14 @@ function FormatMySQLDate(mysqlDate)
     return day .. '/' .. month .. '/' .. year .. ' ' .. hour .. ':' .. min
 end
 
--- Check audit status on spawn
 Citizen.CreateThread(function()
-    -- Wait for ESX to be ready
     Citizen.Wait(5000)
     
-    -- Check if player is being audited
     TriggerServerEvent('altax:requestAuditStatus')
 end)
 
--- UI Events for tax display
 RegisterNetEvent('altax:displayTaxSummaryUI')
 AddEventHandler('altax:displayTaxSummaryUI', function(taxInfo)
-    -- This would be implemented by a UI resource
-    -- For now, it just logs to console
     if Config.Debug then
         print('Tax Summary UI would be displayed here')
     end
@@ -289,7 +255,6 @@ end)
 
 RegisterNetEvent('altax:displayTaxWarningUI')
 AddEventHandler('altax:displayTaxWarningUI', function(amount, days)
-    -- This would be implemented by a UI resource
     if Config.Debug then
         print('Tax Warning UI would be displayed here')
     end
@@ -297,7 +262,6 @@ end)
 
 RegisterNetEvent('altax:displayOverdueUI')
 AddEventHandler('altax:displayOverdueUI', function(amount)
-    -- This would be implemented by a UI resource
     if Config.Debug then
         print('Tax Overdue UI would be displayed here')
     end
@@ -305,7 +269,6 @@ end)
 
 RegisterNetEvent('altax:displayAuditUI')
 AddEventHandler('altax:displayAuditUI', function(isActive, results)
-    -- This would be implemented by a UI resource
     if Config.Debug then
         print('Audit UI would be displayed here, active:', isActive)
     end
@@ -313,7 +276,6 @@ end)
 
 RegisterNetEvent('altax:displayAmnestyUI')
 AddEventHandler('altax:displayAmnestyUI', function(discountPercentage)
-    -- This would be implemented by a UI resource
     if Config.Debug then
         print('Amnesty UI would be displayed here, discount:', discountPercentage)
     end
@@ -321,20 +283,16 @@ end)
 
 RegisterNetEvent('altax:hideAmnestyUI')
 AddEventHandler('altax:hideAmnestyUI', function()
-    -- This would be implemented by a UI resource
     if Config.Debug then
         print('Amnesty UI would be hidden here')
     end
 end)
 
--- Display map blip for tax office
 Citizen.CreateThread(function()
-    -- Optional: add a blip for the tax office
-    -- This is just an example location, change it for your server
-    local blipCoords = vector3(-17.51, -1037.09, 28.85) -- Maze Bank Downtown
+    local blipCoords = vector3(-17.51, -1037.09, 28.85) 
     
     local blip = AddBlipForCoord(blipCoords)
-    SetBlipSprite(blip, 500) -- Use whatever sprite fits best
+    SetBlipSprite(blip, 500) 
     SetBlipDisplay(blip, 4)
     SetBlipScale(blip, 0.8)
     SetBlipColour(blip, 5) -- Yellow
@@ -344,13 +302,9 @@ Citizen.CreateThread(function()
     EndTextCommandSetBlipName(blip)
 end)
 
--- Optional NPC at the tax office for interactions
 Citizen.CreateThread(function()
-    -- Optional: add an NPC for the tax office
-    -- This is just an example location, change it for your server
-    local npcCoords = vector4(-17.51, -1037.09, 28.85, 240.0) -- Maze Bank Downtown
+    local npcCoords = vector4(-17.51, -1037.09, 28.85, 240.0) 
     
-    -- Create NPC
     RequestModel(`a_m_m_business_01`)
     while not HasModelLoaded(`a_m_m_business_01`) do
         Citizen.Wait(1)
@@ -362,7 +316,6 @@ Citizen.CreateThread(function()
     SetEntityInvincible(ped, true)
     SetBlockingOfNonTemporaryEvents(ped, true)
     
-    -- Add interaction marker
     Citizen.CreateThread(function()
         while true do
             Citizen.Wait(0)
@@ -388,7 +341,6 @@ Citizen.CreateThread(function()
     end)
 end)
 
--- Tax interaction menu
 function OpenTaxMenu()
     ESX.UI.Menu.CloseAll()
     
@@ -424,7 +376,6 @@ function OpenTaxMenu()
     end)
 end
 
--- Green vehicle registration menu
 function OpenGreenVehicleMenu()
     ESX.TriggerServerCallback('altax:getOwnedVehicles', function(vehicles)
         local elements = {}
@@ -480,7 +431,6 @@ function OpenGreenVehicleMenu()
     end)
 end
 
--- Callbacks for the tax menu
 RegisterNetEvent('altax:receivePaymentHistory')
 AddEventHandler('altax:receivePaymentHistory', function(payments)
     if not payments or #payments == 0 then
@@ -518,20 +468,14 @@ AddEventHandler('altax:receivePaymentHistory', function(payments)
     end)
 end)
 
--- Functions for player registry
--- These are used to identify players for tax audits and other functions
 function RegisterPlayerForTaxSystem()
-    -- This would run when the player first joins the server
-    -- It creates initial tax records if they don't exist
     TriggerServerEvent('altax:registerPlayer')
 end
 
--- Run this when player spawns
 AddEventHandler('esx:playerLoaded', function(playerData)
     RegisterPlayerForTaxSystem()
 end)
 
--- Helper function to get localized text
 function _(str, ...)
     if Locales[Config.Locale] then
         if Locales[Config.Locale][str] then
