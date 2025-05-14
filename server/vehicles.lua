@@ -1,10 +1,6 @@
--- server/vehicles.lua
--- Handling vehicle tax operations
-
--- Obtain ESX object
 local ESX = exports['es_extended']:getSharedObject()
 
--- Function to get all vehicles owned by a player
+
 function GetPlayerVehicles(identifier)
     local vehicles = MySQL.query.await('SELECT * FROM owned_vehicles WHERE owner = ?', {
         identifier
@@ -13,7 +9,6 @@ function GetPlayerVehicles(identifier)
     return vehicles or {}
 end
 
--- Function to get the number of vehicles owned by a player
 function GetPlayerVehicleCount(identifier)
     local result = MySQL.query.await('SELECT COUNT(*) as count FROM owned_vehicles WHERE owner = ?', {
         identifier
@@ -26,7 +21,6 @@ function GetPlayerVehicleCount(identifier)
     return 0
 end
 
--- Function to get specific vehicle data
 function GetVehicleData(plate)
     local result = MySQL.query.await('SELECT * FROM owned_vehicles WHERE plate = ?', {
         plate
@@ -39,7 +33,6 @@ function GetVehicleData(plate)
     return nil
 end
 
--- Function to get vehicle tax data
 function GetVehicleTaxData(plate)
     local result = MySQL.query.await('SELECT * FROM altax_vehicle_tax WHERE plate = ?', {
         plate
@@ -52,7 +45,6 @@ function GetVehicleTaxData(plate)
     return nil
 end
 
--- Function to update vehicle tax class (for admin purposes)
 function UpdateVehicleTaxClass(plate, taxClass, taxMultiplier)
     MySQL.update('UPDATE altax_vehicle_tax SET tax_class = ?, tax_multiplier = ? WHERE plate = ?', {
         taxClass,
@@ -61,7 +53,6 @@ function UpdateVehicleTaxClass(plate, taxClass, taxMultiplier)
     })
 end
 
--- Function to set a vehicle as tax exempt
 function SetVehicleTaxExemption(plate, isExempt)
     MySQL.update('UPDATE altax_vehicle_tax SET tax_exemption = ? WHERE plate = ?', {
         isExempt and 1 or 0,
@@ -69,14 +60,12 @@ function SetVehicleTaxExemption(plate, isExempt)
     })
 end
 
--- Function to set a vehicle as green (eco-friendly)
 function SetVehicleGreenStatus(plate, isGreen)
     MySQL.update('UPDATE owned_vehicles SET is_green = ? WHERE plate = ?', {
         isGreen and 1 or 0,
         plate
     })
     
-    -- Jika eco-friendly, beri insentif pajak
     if isGreen then
         local vehicleData = GetVehicleData(plate)
         if vehicleData then
@@ -88,12 +77,11 @@ function SetVehicleGreenStatus(plate, isGreen)
     end
 end
 
--- Function to sync vehicle data with tax system when a new vehicle is registered
 function SyncVehicleWithTaxSystem(plate, model, price, owner)
     local vehicleTaxData = GetVehicleTaxData(plate)
     
     if vehicleTaxData then
-        -- Update existing tax data
+
         MySQL.update('UPDATE altax_vehicle_tax SET vehicle_model = ?, purchase_price = ?, owner = ? WHERE plate = ?', {
             model,
             price,
@@ -101,7 +89,7 @@ function SyncVehicleWithTaxSystem(plate, model, price, owner)
             plate
         })
     else
-        -- Create new tax record
+
         MySQL.insert('INSERT INTO altax_vehicle_tax (plate, owner, vehicle_model, purchase_price, purchase_date) VALUES (?, ?, ?, ?, NOW())', {
             plate,
             owner,
@@ -111,7 +99,7 @@ function SyncVehicleWithTaxSystem(plate, model, price, owner)
     end
 end
 
--- Function to calculate tax based on vehicle model
+
 function CalculateModelTax(model, basePrice)
     local taxRate = Config.VehicleTaxBaseRate
     local vehClass = GetVehicleClassFromModel(model)
@@ -120,7 +108,7 @@ function CalculateModelTax(model, basePrice)
     return math.floor(basePrice * (taxRate / 100) * classMultiplier)
 end
 
--- Function to update purchase price for existing vehicle
+
 function UpdateVehiclePurchasePrice(plate, price)
     MySQL.update('UPDATE altax_vehicle_tax SET purchase_price = ? WHERE plate = ?', {
         price,
@@ -133,9 +121,8 @@ function UpdateVehiclePurchasePrice(plate, price)
     })
 end
 
--- Setup event handlers
+
 Citizen.CreateThread(function()
-    -- Event when a vehicle is purchased
     AddEventHandler('esx_vehicleshop:setVehicleOwned', function(source, vehicleProps, vehiclePrice)
         local xPlayer = ESX.GetPlayerFromId(source)
         if not xPlayer then return end
@@ -144,15 +131,13 @@ Citizen.CreateThread(function()
         local plate = vehicleProps.plate
         local model = vehicleProps.model
         
-        -- Register vehicle for tax
         SyncVehicleWithTaxSystem(plate, model, vehiclePrice, identifier)
         
         -- Check if it's a green vehicle (e.g., electric)
         local greenVehicles = {
-            -- Add electric/hybrid car models here, example:
-            [-1622444098] = true, -- voltic (electric sports car)
-            [-1403128555] = true, -- dilettante (hybrid compact car)
-            [-1130810103] = true  -- Khamelion (electric sports car)
+            [-1622444098] = true, 
+            [-1403128555] = true, 
+            [-1130810103] = true  
         }
         
         if greenVehicles[model] then
@@ -161,7 +146,6 @@ Citizen.CreateThread(function()
         end
     end)
     
-    -- Event when a vehicle is sold to another player
     AddEventHandler('esx_vehicleshop:resellVehicle', function(target, plate, price)
         local xTarget = ESX.GetPlayerFromId(target)
         if not xTarget then return end
@@ -173,7 +157,6 @@ Citizen.CreateThread(function()
     end)
 end)
 
--- Register commands for admins
 ESX.RegisterCommand('vehicletax', 'admin', function(xPlayer, args, showError)
     local action = args.action
     local targetPlate = args.plate
@@ -248,7 +231,6 @@ end, true, {help = 'Vehicle tax management', validate = true, arguments = {
     {name = 'price', help = 'Purchase price (for setprice)', type = 'number', optional = true}
 }})
 
--- Export functions for other resources
 exports('GetPlayerVehicles', GetPlayerVehicles)
 exports('GetPlayerVehicleCount', GetPlayerVehicleCount)
 exports('GetVehicleData', GetVehicleData)
