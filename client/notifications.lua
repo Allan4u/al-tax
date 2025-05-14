@@ -1,7 +1,4 @@
--- client/notifications.lua
--- Notification functions for ALTAX tax system
 
--- Simple notification function
 function ShowNotification(message)
     if Config.NotifyType == 'esx' then
         ESX.ShowNotification(message)
@@ -25,7 +22,6 @@ function ShowNotification(message)
     end
 end
 
--- Advanced notification with picture
 function ShowAdvancedNotification(title, subject, message, icon, iconType)
     if Config.NotifyType == 'esx' then
         ESX.ShowAdvancedNotification(title, subject, message, icon, iconType)
@@ -42,7 +38,6 @@ function ShowAdvancedNotification(title, subject, message, icon, iconType)
     elseif Config.NotifyType == 'okokNotify' then
         exports['okokNotify']:Alert(title, message, 7500, 'info')
     else
-        -- Default notification method
         SetNotificationTextEntry('STRING')
         AddTextComponentString(message)
         SetNotificationMessage(icon, icon, true, iconType, title, subject)
@@ -50,10 +45,7 @@ function ShowAdvancedNotification(title, subject, message, icon, iconType)
     end
 end
 
--- Tax notification with HUD display
 function ShowTaxHUDNotification(taxInfo)
-    -- This can be integrated with a custom UI notification system
-    -- For now, just uses standard notification
     
     local message = _U('tax_summary') .. '\n'
     
@@ -79,14 +71,11 @@ function ShowTaxHUDNotification(taxInfo)
     ShowAdvancedNotification('Tax Receipt', _U('tax_receipt', math.random(10000, 99999)), message, 'CHAR_BANK_MAZE', 9)
 end
 
--- Format cash for display
 function FormatCash(amount)
     return ESX.Math.GroupDigits(amount)
 end
 
--- Tax Due Warning Notification with Sound
 function ShowTaxDueWarning(amount, days)
-    -- Play a sound to get attention
     PlaySoundFrontend(-1, "ATM_WINDOW", "HUD_FRONTEND_DEFAULT_SOUNDSET", 1)
     
     local title = "Peringatan Pajak"
@@ -96,9 +85,7 @@ function ShowTaxDueWarning(amount, days)
     ShowAdvancedNotification(title, subject, message, 'CHAR_BANK_MAZE', 1)
 end
 
--- Tax Overdue Notice with Sound
 function ShowTaxOverdueNotice(amount)
-    -- Play a sound to get attention
     PlaySoundFrontend(-1, "Beep_Red", "DLC_HEIST_HACKING_SNAKE_SOUNDS", 1)
     
     local title = "Pajak Tertunggak"
@@ -108,10 +95,8 @@ function ShowTaxOverdueNotice(amount)
     ShowAdvancedNotification(title, subject, message, 'CHAR_BANK_MAZE', 1)
 end
 
--- Audit Notification with Sound
 function ShowAuditNotification(isStarting)
     if isStarting then
-        -- Play a sound to get attention
         PlaySoundFrontend(-1, "Beep_Red", "DLC_HEIST_HACKING_SNAKE_SOUNDS", 1)
         
         local title = "Pemberitahuan Audit"
@@ -120,14 +105,11 @@ function ShowAuditNotification(isStarting)
         
         ShowAdvancedNotification(title, subject, message, 'CHAR_BANK_MAZE', 1)
     else
-        -- Audit completed
         PlaySoundFrontend(-1, "CHECKPOINT_NORMAL", "HUD_MINI_GAME_SOUNDSET", 1)
     end
 end
 
--- Amnesty Notification with Sound
 function ShowAmnestyNotification(discountPercentage)
-    -- Play a sound to get attention
     PlaySoundFrontend(-1, "CHALLENGE_UNLOCKED", "HUD_AWARDS", 1)
     
     local title = "Program Amnesti Pajak"
@@ -137,7 +119,6 @@ function ShowAmnestyNotification(discountPercentage)
     ShowAdvancedNotification(title, subject, message, 'CHAR_BANK_MAZE', 2)
 end
 
--- Create a scaleform message for important tax notifications
 function ShowTaxScaleform(title, message, duration)
     local scaleform = RequestScaleformMovie("mp_big_message_freemode")
     while not HasScaleformMovieLoaded(scaleform) do
@@ -158,7 +139,6 @@ function ShowTaxScaleform(title, message, duration)
     SetScaleformMovieAsNoLongerNeeded(scaleform)
 end
 
--- Register NUI callbacks for tax UI interactions
 RegisterNUICallback('closeTaxUI', function(data, cb)
     isShowingTaxUI = false
     SetNuiFocus(false, false)
@@ -175,7 +155,6 @@ RegisterNUICallback('requestAmnesty', function(data, cb)
     cb({})
 end)
 
--- Export notification functions
 exports('ShowTaxNotification', ShowNotification)
 exports('ShowAdvancedTaxNotification', ShowAdvancedNotification)
 exports('ShowTaxHUD', ShowTaxHUDNotification)
