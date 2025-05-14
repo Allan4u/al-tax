@@ -22,13 +22,11 @@ AddEventHandler('altax:registerGreenVehicle', function(plate)
     
     local registrationFee = 5000
     
-    -- Check if player has enough money
     if xPlayer.getAccount('bank').money < registrationFee then
         TriggerClientEvent('esx:showNotification', source, 'Anda tidak memiliki cukup uang untuk mendaftarkan kendaraan ramah lingkungan')
         return
     end
     
-    -- Check if the vehicle exists and belongs to the player
     local vehicle = MySQL.query.await('SELECT * FROM owned_vehicles WHERE plate = ? AND owner = ?', {
         plate,
         xPlayer.identifier
@@ -39,15 +37,12 @@ AddEventHandler('altax:registerGreenVehicle', function(plate)
         return
     end
     
-    -- Take registration fee
     xPlayer.removeAccountMoney('bank', registrationFee)
     
-    -- Register as green vehicle
     MySQL.update('UPDATE owned_vehicles SET is_green = 1 WHERE plate = ?', {
         plate
     })
     
-    -- Add tax incentive
     TriggerEvent('altax:addGreenVehicleIncentive', source)
     
     TriggerClientEvent('esx:showNotification', source, 'Kendaraan ' .. plate .. ' telah terdaftar sebagai ramah lingkungan')
@@ -62,7 +57,6 @@ AddEventHandler('altax:checkTaxStatus', function()
     
     local identifier = xPlayer.identifier
     
-    -- Get tax record
     local result = MySQL.query.await('SELECT * FROM altax_records WHERE identifier = ?', {
         identifier
     })
@@ -76,10 +70,8 @@ AddEventHandler('altax:checkTaxStatus', function()
         local lateFees = taxRecord.late_fees or 0
         local nextTaxDate = taxRecord.next_tax_date
         
-        -- Calculate estimated next tax
         local estimatedTax = exports.altax:CalculatePlayerTax(xPlayer)
         
-        -- Format next tax date
         local nextTaxDateFormatted = os.date('%d/%m/%Y', ConvertMySQLTimeToTimestamp(nextTaxDate))
         
         local message = 'Informasi Pajak Anda:\n' ..
@@ -104,7 +96,6 @@ AddEventHandler('altax:payOverdueTax', function()
     
     local identifier = xPlayer.identifier
     
-    -- Get overdue amount
     local result = MySQL.query.await('SELECT overdue_amount, late_fees FROM altax_records WHERE identifier = ?', {
         identifier
     })
@@ -119,7 +110,6 @@ AddEventHandler('altax:payOverdueTax', function()
             return
         end
         
-        -- Check for amnesty
         local amnestyDiscount = 0
         if exports.altax:IsAmnestyActive() then
             amnestyDiscount = exports.altax:GetAmnestyDiscount()
@@ -132,22 +122,18 @@ AddEventHandler('altax:payOverdueTax', function()
             end
         end
         
-        -- Check if player has enough money
         local money = xPlayer.getAccount('bank').money
         
         if money >= totalOverdue then
-            -- Take money and clear overdue
             xPlayer.removeAccountMoney('bank', totalOverdue)
             
             MySQL.update('UPDATE altax_records SET overdue_amount = 0, late_fees = 0 WHERE identifier = ?', {
                 identifier
             })
             
-            -- Record payment
             local receiptId = GenerateReceiptId(identifier)
             RecordTaxPayment(identifier, totalOverdue, 'overdue', 'bank', receiptId)
             
-            -- Transfer to government account
             local governmentAccount = Config.TaxRevenueAccount
             if governmentAccount then
                 TriggerEvent('esx_addonaccount:getSharedAccount', governmentAccount, function(account)
@@ -157,14 +143,12 @@ AddEventHandler('altax:payOverdueTax', function()
                 end)
             end
             
-            -- Record amnesty usage if applicable
             if amnestyDiscount > 0 then
                 exports.altax:RecordAmnestyUsage(identifier, overdueAmount + lateFees, overdueAmount + lateFees - totalOverdue)
             end
             
             TriggerClientEvent('esx:showNotification', source, 'Pajak tertunggak sebesar $' .. ESX.Math.GroupDigits(totalOverdue) .. ' telah dibayar')
             
-            -- Send receipt
             TriggerClientEvent('altax:showReceipt', source, {
                 id = receiptId,
                 date = os.date('%Y-%m-%d %H:%M:%S'),
@@ -189,7 +173,6 @@ AddEventHandler('altax:getPaymentHistory', function()
     
     local identifier = xPlayer.identifier
     
-    -- Get payment history
     local payments = MySQL.query.await('SELECT * FROM altax_payments WHERE identifier = ? ORDER BY payment_date DESC LIMIT 10', {
         identifier
     })
@@ -226,13 +209,11 @@ AddEventHandler('altax:registerPlayer', function()
     
     local identifier = xPlayer.identifier
     
-    -- Check if player already has a tax record
     local result = MySQL.query.await('SELECT * FROM altax_records WHERE identifier = ?', {
         identifier
     })
     
     if not result or #result == 0 then
-        -- Create new tax record
         local money = xPlayer.getAccount('bank').money
         local taxBracket = GetTaxBracket(money)
         
@@ -253,14 +234,12 @@ AddEventHandler('altax:registerPlayer', function()
     end
 end)
 
--- Helper function to generate receipt ID
 function GenerateReceiptId(identifier)
     local timestamp = os.time()
     local randomPart = math.random(10000, 99999)
     return string.format('TX-%s-%d-%d', string.sub(identifier, -5), timestamp, randomPart)
 end
 
--- Helper function to record tax payment
 function RecordTaxPayment(identifier, amount, taxType, paymentMethod, receiptId)
     MySQL.insert('INSERT INTO altax_payments (identifier, amount, tax_type, payment_method, receipt_id, tax_period_start, tax_period_end) VALUES (?, ?, ?, ?, ?, DATE_SUB(NOW(), INTERVAL ? DAY), NOW())', {
         identifier,
@@ -272,7 +251,6 @@ function RecordTaxPayment(identifier, amount, taxType, paymentMethod, receiptId)
     })
 end
 
--- Helper function to convert MySQL timestamp to Lua timestamp
 function ConvertMySQLTimeToTimestamp(mysqlTime)
     local pattern = "(%d+)-(%d+)-(%d+) (%d+):(%d+):(%d+)"
     local year, month, day, hour, min, sec = mysqlTime:match(pattern)
@@ -287,7 +265,6 @@ function ConvertMySQLTimeToTimestamp(mysqlTime)
     })
 end
 
--- Get tax bracket based on money amount
 function GetTaxBracket(money)
     for _, bracket in ipairs(Config.IncomeTaxBrackets) do
         if money >= bracket.minMoney and money <= bracket.maxMoney then
@@ -295,6 +272,5 @@ function GetTaxBracket(money)
         end
     end
     
-    -- Default to last bracket if money exceeds all brackets
     return Config.IncomeTaxBrackets[#Config.IncomeTaxBrackets]
 end
