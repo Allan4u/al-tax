@@ -1,10 +1,7 @@
--- server/taxaudit.lua
--- Sistem audit pajak untuk ALTAX
 
 local ESX = exports['es_extended']:getSharedObject()
 local activeAudits = {}
 
--- Inisialisasi sistem audit pajak
 Citizen.CreateThread(function()
     if Config.TaxAuditEnabled then
         InitializeAuditSystem()
@@ -12,7 +9,6 @@ Citizen.CreateThread(function()
 end)
 
 function InitializeAuditSystem()
-    -- Buat tabel audit jika belum ada
     MySQL.query.await([[
         CREATE TABLE IF NOT EXISTS `altax_audit_logs` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -27,89 +23,85 @@ function InitializeAuditSystem()
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ]])
     
-    -- Jadwalkan proses audit acak
     ScheduleRandomAudits()
 end
 
--- Jadwalkan audit acak
 function ScheduleRandomAudits()
-    -- Jalankan setiap 24 jam
     Citizen.CreateThread(function()
         while true do
-            -- Lakukan audit pajak acak
+
             PerformRandomAudits()
             
-            -- Tunggu 24 jam
+          
             Citizen.Wait(24 * 60 * 60 * 1000)
         end
     end)
 end
 
--- Lakukan audit pajak acak
+
 function PerformRandomAudits()
-    -- Dapatkan semua player dengan catatan pajak
+
     local players = MySQL.query.await('SELECT * FROM altax_records')
     
     if not players or #players == 0 then
         return
     end
     
-    -- Loop melalui semua player
+
     for _, player in ipairs(players) do
-        -- Kemungkinan random untuk audit
+      
         if math.random(1, 100) <= Config.AuditChance then
-            -- Mulai audit untuk player ini
+      
             StartAudit(player.identifier)
         end
     end
 end
 
--- Mulai audit untuk player
+
 function StartAudit(identifier)
-    -- Periksa apakah player sudah diaudit dalam 30 hari terakhir
+  
     local lastAudit = MySQL.query.await('SELECT last_audit_date FROM altax_records WHERE identifier = ? AND last_audit_date > DATE_SUB(NOW(), INTERVAL 30 DAY)', {
         identifier
     })
     
     if lastAudit and #lastAudit > 0 then
-        -- Player sudah diaudit baru-baru ini, lewati
+        
         return
     end
     
-    -- Buat record audit baru
+   
     local auditId = MySQL.insert.await('INSERT INTO altax_audit_logs (identifier, audit_result) VALUES (?, "pending")', {
         identifier
     })
     
-    -- Update tanggal audit terakhir player
+  
     MySQL.update('UPDATE altax_records SET last_audit_date = NOW(), audit_count = audit_count + 1 WHERE identifier = ?', {
         identifier
     })
     
-    -- Tambahkan ke daftar audit aktif
+ 
     activeAudits[identifier] = {
         id = auditId,
         startDate = os.time(),
         status = 'pending'
     }
     
-    -- Beritahu player jika online
+    
     local xPlayer = ESX.GetPlayerFromIdentifier(identifier)
     if xPlayer then
         TriggerClientEvent('altax:auditNotice', xPlayer.source)
     end
     
-    -- Jadwalkan penyelesaian audit (3-7 hari)
+
     local auditDuration = math.random(3, 7) * 24 * 60 * 60
     
-    -- Buat thread untuk menyelesaikan audit
+
     Citizen.CreateThread(function()
         Citizen.Wait(auditDuration * 1000)
         CompleteAudit(identifier)
     end)
 end
 
--- Selesaikan audit
 function CompleteAudit(identifier)
     if not activeAudits[identifier] then
         return
@@ -117,10 +109,9 @@ function CompleteAudit(identifier)
     
     local auditId = activeAudits[identifier].id
     
-    -- Tentukan hasil audit
     local auditResult = DetermineAuditResult(identifier)
     
-    -- Update record audit
+
     MySQL.update('UPDATE altax_audit_logs SET audit_result = ?, tax_owed = ?, penalties = ? WHERE id = ?', {
         auditResult.result,
         auditResult.taxOwed,
@@ -128,9 +119,7 @@ function CompleteAudit(identifier)
         auditId
     })
     
-    -- Jika player ditemukan menghindari pajak, tambahkan ke pajak tertunggak
     if auditResult.result == 'evasion_found' and auditResult.taxOwed > 0 then
-        -- Tambahkan ke pajak tertunggak
         MySQL.update('UPDATE altax_records SET overdue_amount = overdue_amount + ?, late_fees = late_fees + ? WHERE identifier = ?', {
             auditResult.taxOwed,
             auditResult.penalties,
@@ -138,7 +127,6 @@ function CompleteAudit(identifier)
         })
     end
     
-    -- Beritahu player tentang hasil audit
     local xPlayer = ESX.GetPlayerFromIdentifier(identifier)
     if xPlayer then
         TriggerClientEvent('altax:auditComplete', xPlayer.source, auditResult)
@@ -148,13 +136,10 @@ function CompleteAudit(identifier)
         end
     end
     
-    -- Hapus dari daftar audit aktif
     activeAudits[identifier] = nil
 end
 
--- Tentukan hasil audit
 function DetermineAuditResult(identifier)
-    -- Dapatkan data player
     local playerData = MySQL.query.await('SELECT * FROM users WHERE identifier = ?', {
         identifier
     })
@@ -167,20 +152,16 @@ function DetermineAuditResult(identifier)
         }
     end
     
-    -- Dapatkan catatan pajak
     local taxRecord = MySQL.query.await('SELECT * FROM altax_records WHERE identifier = ?', {
         identifier
     })
     
-    -- Tentukan kemungkinan penghindaran pajak (simulasi)
-    local evasionChance = 20 -- 20% kemungkinan default
+    local evasionChance = 20 
     
-    -- Kurangi kemungkinan jika player telah membayar banyak pajak
     if taxRecord and #taxRecord > 0 and taxRecord[1].total_tax_paid > 50000 then
         evasionChance = evasionChance - 10
     end
     
-    -- Tingkatkan kemungkinan jika player memiliki banyak uang tapi sedikit pajak dibayar
     local accounts = json.decode(playerData[1].accounts)
     local money = accounts.bank or 0
     
@@ -188,12 +169,10 @@ function DetermineAuditResult(identifier)
         evasionChance = evasionChance + 20
     end
     
-    -- Tentukan apakah ada penghindaran pajak
     local evasionFound = (math.random(1, 100) <= evasionChance)
     
     if evasionFound then
-        -- Hitung pajak yang dihindari dan denda
-        local taxOwed = math.floor(money * 0.05) -- 5% dari uang di bank
+        local taxOwed = math.floor(money * 0.05)
         local penalties = math.floor(taxOwed * Config.AuditPenaltyMultiplier)
         
         return {
@@ -210,18 +189,15 @@ function DetermineAuditResult(identifier)
     end
 end
 
--- Periksa apakah player sedang diaudit
 function IsPlayerBeingAudited(identifier)
     return activeAudits[identifier] ~= nil
 end
 
--- Dapatkan status audit player
 function GetPlayerAuditStatus(identifier)
     if activeAudits[identifier] then
         return activeAudits[identifier]
     end
     
-    -- Cek database untuk audit terbaru
     local result = MySQL.query.await('SELECT * FROM altax_audit_logs WHERE identifier = ? ORDER BY audit_date DESC LIMIT 1', {
         identifier
     })
@@ -239,7 +215,6 @@ function GetPlayerAuditStatus(identifier)
     return nil
 end
 
--- Command untuk admin memulai audit
 ESX.RegisterCommand('taxaudit', 'admin', function(xPlayer, args, showError)
     local targetId = args.playerId
     local action = args.action
@@ -309,7 +284,6 @@ end, true, {help = 'Manajemen audit pajak', validate = true, arguments = {
     {name = 'action', help = 'Tindakan: start, complete, status', type = 'string'}
 }})
 
--- Command untuk player melihat status audit mereka
 ESX.RegisterCommand('myaudit', 'user', function(xPlayer, args, showError)
     local identifier = xPlayer.identifier
     local status = GetPlayerAuditStatus(identifier)
@@ -338,7 +312,6 @@ ESX.RegisterCommand('myaudit', 'user', function(xPlayer, args, showError)
     end
 end, false, {help = 'Cek status audit pajak Anda'})
 
--- Helper function untuk mentranslate hasil audit
 function TranslateAuditResult(result)
     local translations = {
         pending = 'Dalam Proses',
@@ -350,7 +323,6 @@ function TranslateAuditResult(result)
     return translations[result] or result
 end
 
--- Event handler untuk client yang meminta status audit
 RegisterServerEvent('altax:requestAuditStatus')
 AddEventHandler('altax:requestAuditStatus', function()
     local source = source
@@ -366,7 +338,6 @@ AddEventHandler('altax:requestAuditStatus', function()
     end
 end)
 
--- Export fungsi-fungsi untuk resource lain
 exports('StartAudit', StartAudit)
 exports('CompleteAudit', CompleteAudit)
 exports('IsPlayerBeingAudited', IsPlayerBeingAudited)
